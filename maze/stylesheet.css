@@ -1,0 +1,20 @@
+* {
+    font-size: 1.1rem;
+}
+
+
+#links {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+}
+
+.link {
+    /* Get rid of the list dots */
+    list-style: none;
+}
+
+.link img {
+    height: 100px;
+    width: auto;
+}
