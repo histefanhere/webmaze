@@ -7,8 +7,7 @@ n = 20
 chance = 0.4
 
 # Firstly generate an n-sized maze of pages
-maze = network.Maze()
-maze.generate(n)
+maze = network.Maze(n)
 
 # This is an algorithm I came up with for generating a simple maze, purely for testing purposes.
 # The first loop generates a path of links that's guaranteed to link the starting page to the ending one.

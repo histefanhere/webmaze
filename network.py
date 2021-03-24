@@ -1,8 +1,15 @@
+#!/usr/bin/env python3
+
+# This can be removed from python 3.10+
+from __future__ import annotations
+
 import random
 import string
 import os
 import glob
 import json
+
+from typing import Any
 
 class LinkExistsError(Exception):
     """Exception raised when a link is tried to be made between two pages who already have a link between them.
@@ -18,11 +25,6 @@ class LinkExistsError(Exception):
             b.index
         )
         super().__init__(self.message)
-
-def get_template(name):
-    """Return the full file path of an html template file."""
-    with open(f"templates/{name}.html", "r") as f:
-        return f.read()
 
 class Page:
     """A page in the webmaze.
@@ -45,7 +47,7 @@ class Page:
         filename (str): The page's future filename, generated from it's code.
     """
     
-    def __init__(self, index: int, code: str, image: str, maze):
+    def __init__(self, index: int, code: str, image: str, maze: Maze):
         self.links = []
         self.index = index
         self.code = code
@@ -60,7 +62,7 @@ class Page:
         else:
             self.filename = f"{self.code}.html"
     
-    def link(self, other):
+    def link(self, other: Page) -> None:
         """Link one page to another.
 
         This does some error checking to make sure it's a valid link,
@@ -73,7 +75,7 @@ class Page:
             LinkExistsError: A link already exists between pages a and b.
         """
         if other is self:
-            raise ValueError("Cannot link a page to itself")
+            raise ValueError(f"Cannot link page {self.index} to itself")
         elif other in self.links:
             raise LinkExistsError(self, other)
         else:
@@ -82,27 +84,46 @@ class Page:
     
     def create(self, position: str):
         """Generate an HTML file for the page."""
-
-        # Get the template based on if we're the start, middle or end node.
-        template = get_template(f"{position}_page")
-        
-        template = template.replace("$ID", str(self.index))
-        template = template.replace("$IMAGE", self.image)
-
-        template = template.replace("$END", str(self.maze.get_end().image))
-
         random.shuffle(self.links)
-
-        # Create the links list
         link_elements = []
         for link in self.links:
-            element = f"<li class=\"link\"><a href=\"{link.filename}\"> <img src=\"things/{link.image}.jpg\"/> </a></li>"
+            element = self._get_template('link',
+                filename=link.filename,
+                image=link.image
+            )
             link_elements.append(element)
 
-        template = template.replace("$LINKS", "\n".join(link_elements))
+        content = self._get_template(position + "_page",
+            id=self.index,
+            image=self.image,
+            end=self.maze.get_end().image,
+            links="\n".join(link_elements)
+        )
 
         with open(f"maze/{self.filename}", "w+") as file:
-            file.write(template)
+            file.write(content)
+
+    def _get_template(self, name: str, **kwargs: Any) -> str:
+        """A utility function for automating the HTML template process.
+
+        This function when given a name, will return the content from that template file.
+        It will also fill the template variables from all key-value argument pairs passed to it.
+
+        Args:
+            name (str): name of template file
+            **kwargs: key-value pairs of the substitutions that will be made.
+        
+        Returns:
+            File content with substitutions made.
+        """
+        with open(f"templates/{name}.html", "r") as f:
+            content = f.read()
+        
+        for key, value in kwargs.items():
+            content = content.replace(f"${key.upper()}", str(value))
+        
+        return content
+
 
 class Maze:
     """Object representing the whole maze. 
@@ -115,9 +136,9 @@ class Maze:
         image_names (list[str]): List of all available image names.
     """
 
-    def __init__(self):
+    def __init__(self, size: int):
         self.pages = []
-        self.size = 0
+        self.size = size
 
         # Only for reference, so a code or image is never repeated
         self._codes = []
@@ -127,32 +148,18 @@ class Maze:
             self.image_names = json.load(file)
 
             random.shuffle(self.image_names)
-
-    def generate(self, n: int):
-        """Generate n different pages.
-
-        Here we handle things like making sure each page has a unique
-        code and image assigned to them.
-        """
-
-        for _ in range(n):
-            index = self.size
-            code = self._generate_code()
-            image = self._generate_image()
-
-            page = Page(index, code, image, self)
-            self.pages.append(page)
-            self.size += 1
+        
+        self._generate()
     
-    def get_page(self, index: int):
+    def get_page(self, index: int) -> Page:
         """Return the page at index."""
         return self.pages[index]
 
-    def get_end(self):
+    def get_end(self) -> Page:
         """Return the last node, i.e. the destination."""
         return self.get_page(-1)
 
-    def link(self, ai: int, bi: int):
+    def link(self, ai: int, bi: int) -> None:
         """Link two differnet pages together.
 
         Each page gets a copy of the other in their links attributes.
@@ -166,7 +173,7 @@ class Maze:
         """
         self.pages[ai].link(self.pages[bi])
         
-    def create(self):
+    def create(self) -> None:
         """Create the HTML maze.
 
         This method will delete all existing HTML files from `maze` and create a new maze
@@ -183,7 +190,20 @@ class Maze:
             page.create('middle')
         self.pages[-1].create('end')
     
-    def _generate_image(self):
+    def _generate(self) -> None:
+        """Generate n different pages.
+
+        Here we handle things like making sure each page has a unique
+        code and image assigned to them.
+        """
+        for i in range(self.size):
+            code = self._generate_code()
+            image = self._generate_image()
+
+            page = Page(i, code, image, self)
+            self.pages.append(page)
+    
+    def _generate_image(self) -> str:
         """Return a random image name that hasn't been chosen till now.
 
         The image name will also be stored so that it never gets repeated. This
@@ -198,7 +218,7 @@ class Maze:
                 self._images.append(image)
                 return image
 
-    def _generate_code(self):
+    def _generate_code(self) -> str:
         """Return a randomized code that hasn't been chosen till now.
 
         The code is a random string consisting of letters and digits that are URL
@@ -208,8 +228,9 @@ class Maze:
         Returns:
             A unique code.
         """
+        code_length = 8
         while True:
-            code = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
+            code = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(code_length))
             if code not in self._codes:
                 self._codes.append(code)
                 return code
