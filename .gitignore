@@ -1,3 +1,16 @@
+#--------------
+# Custom stuff
+#--------------
+
+# Don't include any of the maze in the repository
+maze/*.html
+
+
+
+#------------------------
+# Github-generated stuff
+#------------------------
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
