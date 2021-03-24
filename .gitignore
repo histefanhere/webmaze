@@ -4,7 +4,8 @@
 
 # Don't include any of the maze in the repository
 maze/*.html
-
+# Not sure why I need to specify this particular file, but sure.
+maze/0.html
 
 
 #------------------------

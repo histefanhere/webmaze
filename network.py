@@ -4,11 +4,23 @@ import os
 import glob
 import json
 
-class LinkExists(Exception):
-    pass
+class LinkExistsError(Exception):
+    """Exception raised when a link is tried to be made between two pages who already have a link between them.
+
+    Args:
+        a (Page): first page.
+        b (Page): second page.
+    """
+
+    def __init__(self, a, b):
+        self.message = "A link already exists between pages {} and {}".format(
+            a.index,
+            b.index
+        )
+        super().__init__(self.message)
 
 def get_template(name):
-    """Return the file path & name of an html template file."""
+    """Return the full file path of an html template file."""
     with open(f"templates/{name}.html", "r") as f:
         return f.read()
 
@@ -19,9 +31,9 @@ class Page:
     with many links to other pages in the network.
 
     Args:
-        index (int): The index of the page and its (internal) identifier.
-        code (str): A random string used as the page's filename.
-        image (str): The name of the image used for the page.
+        index: The index of the page and its (internal) identifier.
+        code: A random string used as the page's filename.
+        image: The name of the image used for the page.
         maze (Maze): A reference to the master maze object.
     
     Attributes:
@@ -33,7 +45,7 @@ class Page:
         filename (str): The page's future filename, generated from it's code.
     """
     
-    def __init__(self, index, code, image, maze):
+    def __init__(self, index: int, code: str, image: str, maze):
         self.links = []
         self.index = index
         self.code = code
@@ -48,21 +60,34 @@ class Page:
         else:
             self.filename = f"{self.code}.html"
     
-    def print(self):
-        print(f"Page #{self.index}")
-        print(f"Links: {self.links}")
-    
-    def create(self):
-        """Generate an HTML file for the page."""
-        if self.index == 0:
-            template = get_template('start_page')
-        elif self.index == self.maze.get_end().index:
-            template = get_template('end_page')
+    def link(self, other):
+        """Link one page to another.
+
+        This does some error checking to make sure it's a valid link,
+        and if it is it updates each page's links accordingly.
+
+        Args:
+            other: The other page to link to.
+        
+        Raises:
+            LinkExistsError: A link already exists between pages a and b.
+        """
+        if other is self:
+            raise ValueError("Cannot link a page to itself")
+        elif other in self.links:
+            raise LinkExistsError(self, other)
         else:
-            template = get_template('middle_page')
+            self.links.append(other)
+            other.links.append(self)
+    
+    def create(self, position: str):
+        """Generate an HTML file for the page."""
+
+        # Get the template based on if we're the start, middle or end node.
+        template = get_template(f"{position}_page")
         
         template = template.replace("$ID", str(self.index))
-        template = template.replace("$IMAGE", str(self.image))
+        template = template.replace("$IMAGE", self.image)
 
         template = template.replace("$END", str(self.maze.get_end().image))
 
@@ -103,7 +128,7 @@ class Maze:
 
             random.shuffle(self.image_names)
 
-    def generate(self, n):
+    def generate(self, n: int):
         """Generate n different pages.
 
         Here we handle things like making sure each page has a unique
@@ -119,7 +144,7 @@ class Maze:
             self.pages.append(page)
             self.size += 1
     
-    def get_page(self, index):
+    def get_page(self, index: int):
         """Return the page at index."""
         return self.pages[index]
 
@@ -127,28 +152,20 @@ class Maze:
         """Return the last node, i.e. the destination."""
         return self.get_page(-1)
 
-    def link(self, ai, bi):
+    def link(self, ai: int, bi: int):
         """Link two differnet pages together.
 
         Each page gets a copy of the other in their links attributes.
 
         Args:
-            ai (int): Index of the first node to link.
-            bi (int): Index of the second node to link.
+            ai: Index of the first node to link.
+            bi: Index of the second node to link.
 
         Raises:
-            LinkExists: A link already exists between pages a and b.
+            LinkExistsError: A link already exists between pages a and b.
         """
-        if ai == bi:
-            raise ValueError("Cannot link a page to itself")
-        a = self.pages[ai]
-        b = self.pages[bi]
-        if b not in a.links:
-            a.links.append(b)
-            b.links.append(a)
-        else:
-            raise LinkExists()
-    
+        self.pages[ai].link(self.pages[bi])
+        
     def create(self):
         """Create the HTML maze.
 
@@ -161,8 +178,10 @@ class Maze:
             os.remove(f)
 
         # Now tell each page to create their individual pages
-        for page in self.pages:
-            page.create()
+        self.pages[0].create('start')
+        for page in self.pages[1:-1]:
+            page.create('middle')
+        self.pages[-1].create('end')
     
     def _generate_image(self):
         """Return a random image name that hasn't been chosen till now.

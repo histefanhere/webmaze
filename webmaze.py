@@ -25,7 +25,7 @@ for i in range(0, n - 2):
         if random.random() < chance:
             try:
                 maze.link(i, j)
-            except network.LinkExists:
+            except network.LinkExistsError:
                 pass
 
 # Create the HTML pages
