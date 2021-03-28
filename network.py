@@ -19,7 +19,7 @@ class LinkExistsError(Exception):
         b (Page): second page.
     """
 
-    def __init__(self, a, b):
+    def __init__(self, a: Page, b: Page):
         self.message = "A link already exists between pages {} and {}".format(
             a.index,
             b.index
